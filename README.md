@@ -16,6 +16,6 @@ Directory structure:
 │
 ├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
 │   └── figures        <- Generated graphics and figures to be used in reporting.
-│   │
+│  
 ├── analyze_data.Rmd   <- Source code for use in this project.
 ```
