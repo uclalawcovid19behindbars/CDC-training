@@ -1,1 +1,60 @@
+---
+title: "CDC Data Training #2"
+author: "UCLA Law COVID-19 Behind Bars Data Project"
+date: "April 2021"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+## Introduction
+
+We will cover a number of topics in this training around how to use the UCLA Law COVID-19 Behind Bars Data Project's data for analysis and visualization purposes. You can expect to leave with a better understanding of how to perform comparative analyses amongst carceral facilities along axes such as gender, public/private status, and state. We will also cover how to merge the UCLA data set with external datasets such as the BJS, or Bureau of Justice Statistics, data. 
+
+There is no prior experience using the R programming language required for this training. For ease of use, we recommend opening this R markdown file and following along within the RStudio application.
+
+## Loading Packages
+
+The code below loads in a few R packages that we'll use to manipulate the data in this session. A package bundles together code and documentation, and allows you to access helpful pre-written functions. To learn more about the most widely-used R packages, feel free to visit [this page](https://www.rstudio.com/products/rpackages/).
+
+```{r package setup}
+## install packages 
+install.packages(c("tidyverse", "devtools")) 
+## load packages into session
+library(tidyverse)
+library(devtools)
+```
+
+The UCLA data team wrote a custom R package to help work with our data. You can read more about the package's functionality in the repository homepage, here: https://github.com/uclalawcovid19behindbars/behindbarstools.
+
+```{r}
+## install UCLA package
+devtools::install_github("uclalawcovid19behindbars/behindbarstools")
+## load UCLA package into session
+library(behindbarstools) 
+## load the UCLA package documentation
+help(package=behindbarstools) 
+```
+
+## Load Data
+
+- show historical vs latest data
+
+```{r}
+
+```
+
+## Filter Data 
+
+- more than 25 cumulative cases 
+
+## Merge Data 
+
+-- what's useful in BJS, HIFLD? 
+
+## Transform Data
+
+- ??
+
 
