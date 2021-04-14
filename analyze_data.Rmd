@@ -18,17 +18,20 @@ There is no prior experience using the R programming language required for this 
 
 The code below loads in a few R packages that we'll use to manipulate the data in this session. A package bundles together code and documentation, and allows you to access helpful pre-written functions. To learn more about the most widely-used R packages, feel free to visit [this page](https://www.rstudio.com/products/rpackages/).
 
-```{r package setup}
-## install packages 
-install.packages(c("tidyverse", "devtools")) 
+```{r package setup, message=FALSE, warning=FALSE}
+## install packages
+## only do this one time 
+# install.packages(c("tidyverse", "devtools", "skimr"))
 ## load packages into session
+## do this every time you re-start R 
 library(tidyverse)
 library(devtools)
+library(skimr)
 ```
 
 The UCLA data team wrote a custom R package to help work with our data. You can read more about the package's functionality in the repository homepage, here: https://github.com/uclalawcovid19behindbars/behindbarstools.
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 ## install UCLA package
 devtools::install_github("uclalawcovid19behindbars/behindbarstools")
 ## load UCLA package into session
@@ -39,22 +42,135 @@ help(package=behindbarstools)
 
 ## Load Data
 
-- show historical vs latest data
+Our latest data presents a snapshot in time of cumulative infections, deaths, recoveries, and other variables across states and jurisdictions. To load in the latest facility-level data, run the code below. 
 
-```{r}
+Note that our [data repository](https://github.com/uclalawcovid19behindbars/data/tree/master/latest-data) has state-aggregated and nationally-aggregated counts available in separate data sheets. 
 
+```{r, message=FALSE, warning=FALSE}
+## should we use read_scrape_data for this? or load directly from github? 
+
+## if this option, walk through how to get to the "raw" data from the data repo 
+# latest_data <- read_csv("https://raw.githubusercontent.com/uclalawcovid19behindbars/data/master/latest-data/adult_facility_covid_counts.csv")
+latest_data <- read_scrape_data(all_dates = FALSE)
+```
+
+For some states, you can also access historical data for all of the state-run facilities for which we collect data. To read in the historical data for the state of California, run the code below.
+
+```{r, message=FALSE, warning=FALSE}
+ca_historical <- read_csv("https://raw.githubusercontent.com/uclalawcovid19behindbars/historical-data/main/data/CA-historical-data.csv")
+```
+
+## Explore Data
+
+I like using the `skim()` function to get a quick glance at any data. You can also view the variable names with the function `names()`.
+
+```{r, message=FALSE, warning=FALSE}
+skim(latest_data)
+names(latest_data)
+```
+
+To dig more into the variables, we can use functions like `table()` and `count()`. We use the pipe, `%>%`, to demonstrate a sequence of functions being called on the top-most data object. To read more about pipes, check out the [documentation here](https://magrittr.tidyverse.org/reference/pipe.html).
+
+```{r, message=FALSE, warning=FALSE}
+## what unique values exist for the variable "jurisdiction"?
+table(latest_data$Jurisdiction)
+## how many entities were observed from each state on the most recent scrape?
+latest_data %>% 
+  count(State)
 ```
 
 ## Filter Data 
 
-- more than 25 cumulative cases 
+We have a lot of different types of facilities in our data set. To create a somewhat comparable group of facilities across the states, we filter to facilities that have had more than 25 COVID-19 infections among the incarcerated populations. 
+
+We also want to filter out jails, since they function quite differently than prisons, and we only collect the largest jails in the US. **other filtering by jurisdiction?**
+
+```{r, message=FALSE, warning=FALSE}
+## number of observations
+nrow(latest_data)
+
+## note missing data 
+table(is.na(latest_data$Residents.Confirmed))
+table(is.na(latest_data$Residents.Population))
+
+filtered_data <- latest_data %>%
+  filter(Residents.Completed > 24) %>% # filter out prisons with less than 25 infections
+  filter(Jurisdiction != "county")
+
+nrow(filtered_data) # filtered out ~730 observations
+
+```
 
 ## Merge Data 
 
--- what's useful in BJS, HIFLD? 
+There is lots of helpful info contained within the BJS, or Bureau of Justice Statistics', data on prisons. We supply the BJS ID number for all facilities when it's identifiable. We can use the BJS ID to merge our data with the BJS data set. 
 
-## Transform Data
+```{r, message=FALSE, warning=FALSE}
+table(is.na(filtered_data$BJS.ID)) ## BJS IDs present for about 2/3 of our data
 
-- ??
+## read in the BJS data
+
+## merge it with our data
+
+## view the merged data set
+
+```
+
+
+## Disaggregate data by facility type
+
+### Gender
+
+First, we look at infection rates and deaths at women's facilities compared to non-women's facilities (includes men's and mixed gender facilities). 
+
+```{r, message=FALSE, warning=FALSE}
+## notice how few women's prisons there are 
+table(filtered_data$Gender)
+
+## combine "mens" and "mixed"
+## calculate the infected case rate using February 2020 population
+gender_dat <- filtered_data %>%
+  mutate(conf_rate = Residents.Confirmed / Population.Feb20,
+         gender_combined = ifelse(Gender == "Female",
+                                  "Women",
+                                  "Mixed")) %>%
+  filter(!is.na(gender_combined)) ## rm observations with missing gender classification
+  
+## summarize by group
+gender_dat %>%
+  group_by(gender_combined) %>%
+  summarise(n = n(),
+            mean_pop = mean(Population.Feb20, na.rm = TRUE),
+            mean_cumulative_cases = mean(Residents.Confirmed, na.rm = TRUE), 
+            mean_case_rate = mean(conf_rate, na.rm = TRUE),
+            sum_deaths = sum_na_rm(Residents.Deaths))
+```
+
+Now, we'll make a plot comparing the infection rate and population by gender. 
+
+```{r, message=FALSE, warning=FALSE}
+
+## notice that women's prisons have smaller populations
+ggplot(gender_dat, 
+       aes(x = Population.Feb20, 
+           y = conf_rate,
+           color = gender_combined)) + 
+    geom_point() #+ 
+    # geom_smooth(method = "lm", se = FALSE)
+
+```
+
+### Public/private status
+
+Next, we leverage the BJS data definition of public/private status to break up our data by that axis. 
+
+```{r, message=FALSE, warning=FALSE}
+## do something similar to gender??
+
+
+```
+
+## Data FAQs
+
 
 
