@@ -12,21 +12,24 @@ output:
 
 We will cover a number of topics in this training around how to use the UCLA Law COVID-19 Behind Bars Data Project's data for analysis and visualization purposes. You can expect to leave with a better understanding of how to perform comparative analyses amongst carceral facilities along axes such as gender, public/private status, and state. We will also cover how to merge the UCLA data set with external datasets such as the BJS, or Bureau of Justice Statistics, data. 
 
-There is no prior experience using the R programming language required for this training. For ease of use, we recommend opening this R markdown file and following along within the RStudio application.
+There is no prior experience using the R programming language required for this training. For ease of use, we recommend opening this R Markdown file and following along within the RStudio application.
 
 ## Loading Packages
 
 The code below loads in a few R packages that we'll use to manipulate the data in this session. A package bundles together code and documentation, and allows you to access helpful pre-written functions. To learn more about the most widely-used R packages, feel free to visit [this page](https://www.rstudio.com/products/rpackages/).
 
 ```{r package setup, message=FALSE, warning=FALSE}
-## install packages
-## only do this one time 
+## NB: if we clean up and save BJS data ahead of time, remove "haven" and "sjlabelled" from this list
+
+## install packages by un-commenting the line below (only do this one time) 
 # install.packages(c("tidyverse", "devtools", "skimr"))
 ## load packages into session
 ## do this every time you re-start R 
-library(tidyverse)
+library(tidyverse) 
 library(devtools)
 library(skimr)
+library(haven)
+library(sjlabelled)
 ```
 
 The UCLA data team wrote a custom R package to help work with our data. You can read more about the package's functionality in the repository homepage, here: https://github.com/uclalawcovid19behindbars/behindbarstools.
@@ -62,7 +65,7 @@ ca_historical <- read_csv("https://raw.githubusercontent.com/uclalawcovid19behin
 
 ## Explore Data
 
-I like using the `skim()` function to get a quick glance at any data. You can also view the variable names with the function `names()`.
+I like using the `skim()` function to get a quick glance at any data. You can also view the variable names by calling the function `names()`.
 
 ```{r, message=FALSE, warning=FALSE}
 skim(latest_data)
@@ -83,9 +86,11 @@ latest_data %>%
 
 We have a lot of different types of facilities in our data set. To create a somewhat comparable group of facilities across the states, we filter to facilities that have had more than 25 COVID-19 infections among the incarcerated populations. 
 
-We also want to filter out jails, since they function quite differently than prisons, and we only collect the largest jails in the US. **other filtering by jurisdiction?**
+We also want to filter out jails, since they function quite differently than prisons, and we only collect the largest jails in the US. 
 
 ```{r, message=FALSE, warning=FALSE}
+## add any other data filters to this?
+
 ## number of observations
 nrow(latest_data)
 
@@ -94,11 +99,21 @@ table(is.na(latest_data$Residents.Confirmed))
 table(is.na(latest_data$Residents.Population))
 
 filtered_data <- latest_data %>%
-  filter(Residents.Completed > 24) %>% # filter out prisons with less than 25 infections
+  filter(Residents.Confirmed > 24) %>% # filter out prisons with less than 25 infections
   filter(Jurisdiction != "county")
 
 nrow(filtered_data) # filtered out ~730 observations
+```
 
+Towards the goal of comparing facilities of different sizes, we calculate infection rates using the population from February 2020 as our denominator, and the cumulative number of COVID-19 infections among the incarcerated population as the numerator.
+
+```{r, message=FALSE, warning=FALSE}
+filtered_data <- filtered_data %>%
+  mutate(confirmed_rate = Residents.Confirmed / Population.Feb20) 
+
+## notice that some values are NA because of missing values in the denominator 
+table(is.na(filtered_data$confirmed_rate)) 
+table(is.na(filtered_data$Residents.Confirmed))
 ```
 
 ## Merge Data 
@@ -109,12 +124,34 @@ There is lots of helpful info contained within the BJS, or Bureau of Justice Sta
 table(is.na(filtered_data$BJS.ID)) ## BJS IDs present for about 2/3 of our data
 
 ## read in the BJS data
+## should we host this data somewhere? if so, replace this path with a stable link
+## downloaded "STATA" verison of the data here: https://www.icpsr.umich.edu/web/NACJD/studies/37294# 
+bjs_data_path <- file.path("~", "UCLA", "misc-data", "BJS", 
+                           "ICPSR_37294", "DS0001","37294-0001-Data.dta")
+bjs_raw <- haven::read_dta(bjs_data_path)
+skim(bjs_raw)
+
+## get the labels to the data
+## for more on working with labelled data: https://www.pipinghotdata.com/posts/2020-12-23-leveraging-labelled-data-in-r/
+bjs <- sjlabelled::label_to_colnames(bjs_raw) %>%
+  mutate_if(haven::is.labelled, haven::as_factor)
+skim(bjs)
+
+## inspect the "private" operator variables more
+table(bjs$`Facility operator`)
+## what % of the facilities in the BJS data set are privately operated?
+round((table(bjs$`Facility operator`) / nrow(bjs))*100, 2)
 
 ## merge it with our data
+merged_df <- filtered_data %>% 
+  left_join(bjs, 
+            by = c("BJS.ID" = "Facility ID #1")) ## specify the variable in common between the two data sets
 
 ## view the merged data set
-
+#View(merged_df)
 ```
+
+Now, we create some plots showing facility-level infection rates by facility operator type.
 
 
 ## Disaggregate data by facility type
@@ -128,10 +165,8 @@ First, we look at infection rates and deaths at women's facilities compared to n
 table(filtered_data$Gender)
 
 ## combine "mens" and "mixed"
-## calculate the infected case rate using February 2020 population
 gender_dat <- filtered_data %>%
-  mutate(conf_rate = Residents.Confirmed / Population.Feb20,
-         gender_combined = ifelse(Gender == "Female",
+  mutate(gender_combined = ifelse(Gender == "Female",
                                   "Women",
                                   "Mixed")) %>%
   filter(!is.na(gender_combined)) ## rm observations with missing gender classification
@@ -142,7 +177,7 @@ gender_dat %>%
   summarise(n = n(),
             mean_pop = mean(Population.Feb20, na.rm = TRUE),
             mean_cumulative_cases = mean(Residents.Confirmed, na.rm = TRUE), 
-            mean_case_rate = mean(conf_rate, na.rm = TRUE),
+            mean_case_rate = mean(confirmed_rate, na.rm = TRUE),
             sum_deaths = sum_na_rm(Residents.Deaths))
 ```
 
@@ -151,23 +186,75 @@ Now, we'll make a plot comparing the infection rate and population by gender.
 ```{r, message=FALSE, warning=FALSE}
 
 ## notice that women's prisons have smaller populations
-ggplot(gender_dat, 
+gender_plot <- ggplot(gender_dat, 
        aes(x = Population.Feb20, 
-           y = conf_rate,
+           y = confirmed_rate,
            color = gender_combined)) + 
-    geom_point() #+ 
-    # geom_smooth(method = "lm", se = FALSE)
+    geom_point() 
+gender_plot
 
 ```
 
+Both the x-axis and the y-axis have most values grouped at the beginning of the scale, and a few outliers with very high populations and infection rates. Let's try putting the x- and y- axes on a log scale to bget a better look at what's going on in the data!
+
+```{r}
+## not sure whether or not to actually include this...............
+gender_plot + 
+  # Log transformation using scale_x/y_continuous()
+  # ?scale_x_continuous to see built-in transformations
+  scale_x_continuous(trans='log') +
+  scale_y_continuous(trans='log')
+```
+
+
+DISCUSS: What are your questions after looking at this plot? What questions, if any, does it answer?
+
 ### Public/private status
 
-Next, we leverage the BJS data definition of public/private status to break up our data by that axis. 
+Next, we leverage the BJS data specification of facility operator to group facilities by private and non-private status.
+
 
 ```{r, message=FALSE, warning=FALSE}
-## do something similar to gender??
+## NOTE: not sure if we should include this section at all! 
 
+## how many of the observations in the ucla data set are privately operated?
+table(merged_df$`Facility operator`)
 
+merged_out <- merged_df %>%
+  filter(!is.na(`Facility operator`)) %>% ## rm observations with missing facility operator classification
+  mutate(is_private = ifelse(`Facility operator` == "Private contractor",
+                          TRUE,
+                          FALSE))
+
+table(merged_out$is_private)
+
+ggplot(merged_out, 
+       aes(x = Population.Feb20, 
+           y = confirmed_rate,
+           color = is_private
+           # color = `Facility operator`
+           )) + 
+    geom_point() + 
+  scale_x_continuous(trans='log') +
+  scale_y_continuous(trans='log')
+```
+
+## Comparing infection rates to the non-incarcerated population
+
+TO DO: Choose a facility from California historical data and make a plot comparing it to county-level pop infection rates
+
+```{r}
+gen_df <- "https://raw.githubusercontent.com/nytimes/covid-19-data/master/" %>%
+    str_c("us.csv") %>%
+    read_csv(col_types = cols()) %>%
+    select(Date = date, Confirmed = cases, Deaths = deaths) %>%
+    arrange(Date) %>%
+    # not necessary but a good sanity check
+    distinct(Date, .keep_all = TRUE) %>%
+    mutate(Active = diff_roll_sum(Confirmed, Date)) %>%
+    # us census data
+    mutate(Population = 328200000) %>%
+    mutate(Name = "US\nPopulation")
 ```
 
 ## Data FAQs
