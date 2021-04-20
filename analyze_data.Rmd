@@ -233,7 +233,7 @@ gender_plot
 
 Both the x-axis and the y-axis have most values grouped at the beginning of the scale, and a few outliers with very high populations and infection rates. Let's try putting the x- and y- axes on a log scale to bget a better look at what's going on in the data!
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 ## not sure whether or not to actually include this...............
 gender_plot + 
   # Log transformation using scale_x/y_continuous()
@@ -248,7 +248,7 @@ DISCUSS: What are your questions after looking at this plot? What questions, if 
 
 Next, we'll show how to use our historical COVID-19 data from carceral facilities to make comparisons between the infection rate inside of prison and in the surrounding county over time. We use the New York Times' COVID-19 data of cumulative cases and deaths in the US population on the county-level, available to the public here: https://github.com/nytimes/covid-19-data. 
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 ## read in the NYT data
 us_counties_df <- "https://raw.githubusercontent.com/nytimes/covid-19-data/master/" %>%
    # str_c("us.csv") %>% # uncomment this for overall US data
@@ -264,7 +264,7 @@ us_counties_df <- "https://raw.githubusercontent.com/nytimes/covid-19-data/maste
 ```
 We'll use the California historical data to compare the COVID-19 infection rates over time in one prison to the surrounding county. 
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 ## how many observations do we have for each prison in California? 
 ca_historical %>%
   count(Name) %>% 
@@ -289,7 +289,7 @@ head(ca_focus)
 ```
 Now, we want to bind the county-level infection rate data with the UCLA prison data in order to make comparisons between COVID-19 outbreaks inside and outside of prison. To do so, we'll need to subset the county-level infection to the county in which our focus prison is located. We add in the total county population in order to calculate comparable rates, and then bind the two data sets together. 
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 ## where is this prison located? 
 ca_focus %>%
   select(County.FIPS, County)
@@ -315,7 +315,7 @@ table(county_comparison$Name)
 
 Now that we have a comparable data set with both the focus prison and the surrounding county's estimated active infection rates, we can make a plot. 
 
-```{r}
+```{r, message=FALSE, warning=FALSE, fig.width = 10}
 county_comparison %>%
  ggplot(., aes(x = Date, y = Percent, color = Name)) +
   geom_line(size = 2) +
