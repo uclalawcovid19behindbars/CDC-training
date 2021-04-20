@@ -22,7 +22,7 @@ The code below loads in a few R packages that we'll use to manipulate the data i
 ## NB: if we clean up and save BJS data ahead of time, remove "haven" and "sjlabelled" from this list
 
 ## install packages by un-commenting the line below (only do this one time) 
-# install.packages(c("tidyverse", "devtools", "skimr"))
+# install.packages(c("tidyverse", "devtools", "skimr", "haven", "sjlabelled", "stringr))
 ## load packages into session
 ## do this every time you re-start R 
 library(tidyverse) 
@@ -30,6 +30,7 @@ library(devtools)
 library(skimr)
 library(haven)
 library(sjlabelled)
+library(stringr)
 ```
 
 The UCLA data team wrote a custom R package to help work with our data. You can read more about the package's functionality in the repository homepage, here: https://github.com/uclalawcovid19behindbars/behindbarstools.
@@ -80,7 +81,13 @@ table(latest_data$Jurisdiction)
 ## how many entities were observed from each state on the most recent scrape?
 latest_data %>% 
   count(State)
+
+## add "arrange" to the sequence of pipes to view the counts in order
+latest_data %>%
+  count(State) %>%
+  arrange(desc(n))
 ```
+
 
 ## Filter Data 
 
@@ -129,12 +136,15 @@ table(is.na(filtered_data$BJS.ID)) ## BJS IDs present for about 2/3 of our data
 bjs_data_path <- file.path("~", "UCLA", "misc-data", "BJS", 
                            "ICPSR_37294", "DS0001","37294-0001-Data.dta")
 bjs_raw <- haven::read_dta(bjs_data_path)
-skim(bjs_raw)
+names(bjs_raw)
+```
+It's hard to use this data when the variable names are so opaque! This data is *labelled*, meaning that the variable names and values are encoded in special ways. We use the `sjlabelled` and `haven` packages to make the BJS data more user-friendly. For more on working with labelled data in R, check out this article: https://www.pipinghotdata.com/posts/2020-12-23-leveraging-labelled-data-in-r/.
 
-## get the labels to the data
-## for more on working with labelled data: https://www.pipinghotdata.com/posts/2020-12-23-leveraging-labelled-data-in-r/
+```{r}
+## convert column labels to column names
 bjs <- sjlabelled::label_to_colnames(bjs_raw) %>%
-  mutate_if(haven::is.labelled, haven::as_factor)
+  ## convert labelled variables to factors
+  mutate_if(haven::is.labelled, haven::as_factor) 
 skim(bjs)
 
 ## inspect the "private" operator variables more
@@ -142,80 +152,25 @@ table(bjs$`Facility operator`)
 ## what % of the facilities in the BJS data set are privately operated?
 round((table(bjs$`Facility operator`) / nrow(bjs))*100, 2)
 
-## merge it with our data
+## merge the two data sets together
 merged_df <- filtered_data %>% 
+  ## UCLA variable named "BJS.ID" matches up to BJS variable "Facility ID #1" 
   left_join(bjs, 
-            by = c("BJS.ID" = "Facility ID #1")) ## specify the variable in common between the two data sets
+            by = c("BJS.ID" = "Facility ID #1")) 
 
 ## view the merged data set
 #View(merged_df)
 ```
 
-Now, we create some plots showing facility-level infection rates by facility operator type.
-
-
 ## Disaggregate data by facility type
-
-### Gender
-
-First, we look at infection rates and deaths at women's facilities compared to non-women's facilities (includes men's and mixed gender facilities). 
-
-```{r, message=FALSE, warning=FALSE}
-## notice how few women's prisons there are 
-table(filtered_data$Gender)
-
-## combine "mens" and "mixed"
-gender_dat <- filtered_data %>%
-  mutate(gender_combined = ifelse(Gender == "Female",
-                                  "Women",
-                                  "Mixed")) %>%
-  filter(!is.na(gender_combined)) ## rm observations with missing gender classification
-  
-## summarize by group
-gender_dat %>%
-  group_by(gender_combined) %>%
-  summarise(n = n(),
-            mean_pop = mean(Population.Feb20, na.rm = TRUE),
-            mean_cumulative_cases = mean(Residents.Confirmed, na.rm = TRUE), 
-            mean_case_rate = mean(confirmed_rate, na.rm = TRUE),
-            sum_deaths = sum_na_rm(Residents.Deaths))
-```
-
-Now, we'll make a plot comparing the infection rate and population by gender. 
-
-```{r, message=FALSE, warning=FALSE}
-
-## notice that women's prisons have smaller populations
-gender_plot <- ggplot(gender_dat, 
-       aes(x = Population.Feb20, 
-           y = confirmed_rate,
-           color = gender_combined)) + 
-    geom_point() 
-gender_plot
-
-```
-
-Both the x-axis and the y-axis have most values grouped at the beginning of the scale, and a few outliers with very high populations and infection rates. Let's try putting the x- and y- axes on a log scale to bget a better look at what's going on in the data!
-
-```{r}
-## not sure whether or not to actually include this...............
-gender_plot + 
-  # Log transformation using scale_x/y_continuous()
-  # ?scale_x_continuous to see built-in transformations
-  scale_x_continuous(trans='log') +
-  scale_y_continuous(trans='log')
-```
-
-
-DISCUSS: What are your questions after looking at this plot? What questions, if any, does it answer?
 
 ### Public/private status
 
-Next, we leverage the BJS data specification of facility operator to group facilities by private and non-private status.
+Now, that we have merged the UCLA COVID-19 dataset with the BJS facility information dataset, we can create plots and analyses exploring facility-level infection rates by facility operator type. We utilize the BJS specification of facility operator to group facilities by private and non-private status.
 
 
 ```{r, message=FALSE, warning=FALSE}
-## NOTE: not sure if we should include this section at all! 
+## QUESTION - should we include this section?? not sure how helpful it is
 
 ## how many of the observations in the ucla data set are privately operated?
 table(merged_df$`Facility operator`)
@@ -239,22 +194,136 @@ ggplot(merged_out,
   scale_y_continuous(trans='log')
 ```
 
-## Comparing infection rates to the non-incarcerated population
+### Gender
 
-TO DO: Choose a facility from California historical data and make a plot comparing it to county-level pop infection rates
+Next, we compare facilities infection rates and deaths along another axis: facility gender. Comparing the data UCLA collects from women's facilities to non-women's facilities (which includes men's and mixed gender facilities) helps show how the pandemic has impacted a particularly vulnerable group inside. 
+
+```{r, message=FALSE, warning=FALSE}
+## notice how few women's prisons there are 
+table(filtered_data$Gender)
+
+## combine "mens" and "mixed"
+gender_dat <- filtered_data %>%
+  mutate(gender_combined = ifelse(Gender == "Female",
+                                  "Women",
+                                  "Mixed")) %>%
+  filter(!is.na(gender_combined)) ## rm observations with missing gender classification
+  
+## summarize by group
+gender_dat %>%
+  group_by(gender_combined) %>%
+  summarise(n = n(),
+            mean_pop = mean(Population.Feb20, na.rm = TRUE),
+            mean_cumulative_cases = mean(Residents.Confirmed, na.rm = TRUE), 
+            mean_case_rate = mean(confirmed_rate, na.rm = TRUE),
+            sum_deaths = sum_na_rm(Residents.Deaths))
+```
+
+Let's create a plot comparing the infection rate and population by aggregate gender. 
+
+```{r, message=FALSE, warning=FALSE}
+## notice that women's prisons have smaller populations
+gender_plot <- ggplot(gender_dat, 
+       aes(x = Population.Feb20, 
+           y = confirmed_rate,
+           color = gender_combined)) + 
+    geom_point() 
+gender_plot
+```
+
+Both the x-axis and the y-axis have most values grouped at the beginning of the scale, and a few outliers with very high populations and infection rates. Let's try putting the x- and y- axes on a log scale to bget a better look at what's going on in the data!
 
 ```{r}
-gen_df <- "https://raw.githubusercontent.com/nytimes/covid-19-data/master/" %>%
-    str_c("us.csv") %>%
-    read_csv(col_types = cols()) %>%
-    select(Date = date, Confirmed = cases, Deaths = deaths) %>%
-    arrange(Date) %>%
-    # not necessary but a good sanity check
-    distinct(Date, .keep_all = TRUE) %>%
-    mutate(Active = diff_roll_sum(Confirmed, Date)) %>%
-    # us census data
-    mutate(Population = 328200000) %>%
-    mutate(Name = "US\nPopulation")
+## not sure whether or not to actually include this...............
+gender_plot + 
+  # Log transformation using scale_x/y_continuous()
+  # ?scale_x_continuous to see built-in transformations
+  scale_x_continuous(trans='log') +
+  scale_y_continuous(trans='log')
+```
+
+DISCUSS: What are your questions after looking at this plot? What questions, if any, does it answer?
+
+## County-level Comparison
+
+Next, we'll show how to use our historical COVID-19 data from carceral facilities to make comparisons between the infection rate inside of prison and in the surrounding county over time. We use the New York Times' COVID-19 data of cumulative cases and deaths in the US population on the county-level, available to the public here: https://github.com/nytimes/covid-19-data. 
+
+```{r}
+## read in the NYT data
+us_counties_df <- "https://raw.githubusercontent.com/nytimes/covid-19-data/master/" %>%
+   # str_c("us.csv") %>% # uncomment this for overall US data
+  str_c("us-counties.csv") %>%
+  read_csv(col_types = cols()) %>%
+  select(Date = date, 
+         Confirmed = cases, 
+         Deaths = deaths,
+         State = state,
+         County.FIPS = fips,
+         County = county) %>%
+  mutate(Name = "County Population")
+```
+We'll use the California historical data to compare the COVID-19 infection rates over time in one prison to the surrounding county. 
+
+```{r}
+## how many observations do we have for each prison in California? 
+ca_historical %>%
+  count(Name) %>% 
+  arrange(desc(n))
+
+## select a prison to focus on! 
+## CALIFORNIA STATE PRISON CORCORAN had ~4 separate outbreaks, could use that one
+focus_prison <- "CALIFORNIA CORRECTIONAL INSTITUTION"
+
+## subset the data to the focus prison
+ca_focus <- ca_historical %>%
+  filter(Name == focus_prison) %>%
+  ## rename historical population variable
+  rename(Population = Residents.Population) %>%
+  mutate(County.FIPS = as.character(County.FIPS),
+         County.FIPS = stringr::str_pad(County.FIPS, 5, pad = "0")) %>%
+  arrange(Date) %>%
+  ## estimate active infections from cumulative count
+  mutate(Active = diff_roll_sum(Residents.Confirmed, Date)) 
+  
+head(ca_focus)
+```
+Now, we want to bind the county-level infection rate data with the UCLA prison data in order to make comparisons between COVID-19 outbreaks inside and outside of prison. To do so, we'll need to subset the county-level infection to the county in which our focus prison is located. We add in the total county population in order to calculate comparable rates, and then bind the two data sets together. 
+
+```{r}
+## where is this prison located? 
+ca_focus %>%
+  select(County.FIPS, County)
+
+prison_county_fips <- ca_focus$County.FIPS[1]
+
+## subset NYT data to surrounding county
+one_county <- us_counties_df %>% 
+  filter(County.FIPS == prison_county_fips) %>%
+  ## add total county population: https://www.census.gov/quickfacts/kerncountycalifornia
+  mutate(Population = 900202) %>%
+  arrange(Date) %>%
+  ## estimate active infections from cumulative count
+  mutate(Active = diff_roll_sum(Confirmed, Date)) 
+
+county_comparison <- ca_focus %>%
+  bind_rows(one_county) %>%
+  ## calculate estimated active infection rate
+  mutate(Percent = Active / Population)
+
+table(county_comparison$Name)
+```
+
+Now that we have a comparable data set with both the focus prison and the surrounding county's estimated active infection rates, we can make a plot. 
+
+```{r}
+county_comparison %>%
+ ggplot(., aes(x = Date, y = Percent, color = Name)) +
+  geom_line(size = 2) +
+  theme_minimal() + 
+  labs(title = "Comparison of CA Prison and Surrounding County with Active Infections", 
+       y = "Percent of Population Actively Infected") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(color = "")
 ```
 
 ## Data FAQs
