@@ -269,7 +269,7 @@ gender_plot <- ggplot(gender_dat,
        aes(x = Population.Feb20, 
            y = confirmed_rate,
            color = gender_combined)) + 
-    geom_point() 
+    geom_point(size = 1.0) 
 gender_plot
 ```
 
@@ -358,13 +358,13 @@ Now that we have a comparable data set with both the focus prison and the surrou
 
 ```{r, message=FALSE, warning=FALSE, fig.width = 10}
 county_comparison %>%
- ggplot(., aes(x = Date, y = Percent, color = Name)) +
+ ggplot(aes(x = Date, y = Percent, color = Name)) +
   geom_line(size = 1) +
-  theme_minimal() + 
   labs(title = "Comparison of CA Prison and Surrounding County with Active Infections", 
        y = "Percent of Population Actively Infected") +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-  labs(color = "")
+  theme(legend.position = "top", 
+        legend.title = element_blank())
 ```
 
 ## Data FAQs
