@@ -19,8 +19,6 @@ There is no prior experience using the R programming language required for this 
 The code below loads in a few R packages that we'll use to manipulate the data in this session. A package bundles together code and documentation, and allows you to access helpful pre-written functions. To learn more about the most widely-used R packages, feel free to visit [this page](https://www.rstudio.com/products/rpackages/).
 
 ```{r package setup, message=FALSE, warning=FALSE}
-## NB: if we clean up and save BJS data ahead of time, remove "haven" and "sjlabelled" from this list
-
 ## install packages by un-commenting the line below (only do this one time) 
 # install.packages(c("tidyverse", "devtools", "skimr", "haven", "sjlabelled", "stringr))
 ## load packages into session
@@ -53,12 +51,6 @@ Out Github repository also includes state-aggregated and nationally-aggregated c
 ```{r, message=FALSE, warning=FALSE}
 ## load using behindbarstools 
 latest_data <- read_scrape_data(all_dates = FALSE)
-
-## load from Github  
-# latest_data <- read_csv(stringr::str_c(
-#   "https://raw.githubusercontent.com/uclalawcovid19behindbars/data/master/",
-#   "latest-data/adult_facility_covid_counts.csv")
-# )
 ```
 
 For several states, you can also access historical data for all of the state-run facilities for which we collect data. To read in the historical data for the state of California, for example, run the code below.
@@ -66,12 +58,6 @@ For several states, you can also access historical data for all of the state-run
 ```{r, message=FALSE, warning=FALSE}
 ## load using behindbarstools 
 ca_historical <- read_scrape_data(all_dates = TRUE, state = "California")
-
-## load from Github 
-# ca_historical <- read_csv(stringr::str_c(
-#   "https://raw.githubusercontent.com/uclalawcovid19behindbars/historical-data/", 
-#   "main/data/CA-historical-data.csv")
-# )
 ```
 
 ## Explore Data
@@ -107,8 +93,6 @@ We have a lot of different types of facilities in our data set. To create a some
 We also want to filter out jails, since they function quite differently than prisons, and we only collect data from the handful of large jail systems in the US that report COVID-19 data on a regular basis. 
 
 ```{r, message=FALSE, warning=FALSE}
-## add any other data filters to this?
-
 ## number of observations
 nrow(latest_data)
 
@@ -134,6 +118,15 @@ table(is.na(filtered_data$confirmed_rate))
 table(is.na(filtered_data$Residents.Confirmed))
 ```
 
+Which facilities had the highest infection rate on the most recent date of data collection? 
+
+```{r, message=FALSE, warning=FALSE}
+filtered_data %>%
+  arrange(desc(confirmed_rate)) %>%
+  select(Jurisdiction, State, Name)
+  head()
+```
+
 ## Merge Data 
 There is lots of helpful info contained within the BJS, or Bureau of Justice Statistics', [census data on correctional facilities](https://www.bjs.gov/index.cfm?ty=dcdetail&iid=255). We supply the BJS ID number for all facilities when it's identifiable. We can use the `BJS.ID` variable to merge our data with the BJS data set. 
 
@@ -141,13 +134,9 @@ There is lots of helpful info contained within the BJS, or Bureau of Justice Sta
 table(is.na(filtered_data$BJS.ID)) ## BJS IDs present for about 2/3 of our data
 
 ## read in the BJS data
-## should we host this data somewhere? if so, replace this path with a stable link
-## downloaded "STATA" version of the data here: https://www.icpsr.umich.edu/web/NACJD/studies/37294# 
-# bjs_data_path <- file.path("~", "UCLA", "misc-data", "BJS", 
-#                            "ICPSR_37294", "DS0001","37294-0001-Data.dta")
-bjs_data_path <- "~/covid19behindbars/CDC-training/37294-0001-Data.dta"
+bjs_data_url <- "https://github.com/uclalawcovid19behindbars/CDC-training/raw/main/data/raw/37294-0001-Data.dta"
 
-bjs_raw <- haven::read_dta(bjs_data_path)
+bjs_raw <- haven::read_dta(file = bjs_data_url)
 names(bjs_raw)
 ```
 It's hard to use this data when the variable names are so opaque! This data is *labelled*, meaning that the variable names and values are encoded in special ways. We use the `sjlabelled` and `haven` packages to make the BJS data more user-friendly. For more on working with labelled data in R, check out [this article](https://www.pipinghotdata.com/posts/2020-12-23-leveraging-labelled-data-in-r/).
@@ -181,8 +170,6 @@ merged_df <- filtered_data %>%
 Now, that we have merged the UCLA COVID-19 dataset with the BJS facility information dataset, we can create plots and analyses exploring facility-level infection rates by facility operator type. We utilize the BJS specification of facility operator to group facilities by private and non-private status.
 
 ```{r, message=FALSE, warning=FALSE}
-## QUESTION - should we include this section?? not sure how helpful it is
-
 ## how many of the observations in the ucla data set are privately operated?
 table(merged_df$`Facility operator`)
 
@@ -212,7 +199,6 @@ private_plot <- ggplot(merged_out,
        aes(x = Population.Feb20, 
            y = confirmed_rate,
            color = is_private
-           # color = `Facility operator`
            )) + 
     geom_point(size = 1.0) 
 private_plot
@@ -274,7 +260,6 @@ gender_plot
 ```
 
 ```{r, message=FALSE, warning=FALSE}
-## not sure whether or not to actually include this...............
 gender_plot + 
   # Log transformation using scale_x/y_continuous()
   # ?scale_x_continuous to see built-in transformations
@@ -369,3 +354,23 @@ county_comparison %>%
 
 ## Data FAQs
 
+#### How do I access the data if I'm not programming in R? 
+
+If you're not programming in R, there are ways to access our data outside of calling the function `read_scrape_data()`. You can read the CSV files saved to our GitHub repositories from any computer. This works for both the most recently scraped data, and the historical data (for the states cleaned thus far). 
+
+The latest data saved to our GitHub repository contains a subset of the descriptive facility variables included in the result of `read_scrape_data()`. Therefore, if you're interested in using variables such as `BJS.ID` or `Gender`, you may want to access the data from R using `read_scrape_data()`, and save the result as a CSV on your computer.
+
+```{r, message=FALSE, warning=FALSE}
+## load latest data from Github
+latest_data <- read_csv(stringr::str_c(
+  "https://raw.githubusercontent.com/uclalawcovid19behindbars/data/master/",
+  "latest-data/adult_facility_covid_counts.csv")
+)
+
+## load historical data from Github 
+## replace state acronym with the state you want to access
+ca_historical <- read_csv(stringr::str_c(
+  "https://raw.githubusercontent.com/uclalawcovid19behindbars/historical-data/main/data/",
+  "CA-historical-data.csv") ## state acronym here
+)
+```
