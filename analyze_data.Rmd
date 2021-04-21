@@ -10,7 +10,7 @@ output:
 
 ## Introduction
 
-We will cover a number of topics in this training around how to use the UCLA Law COVID-19 Behind Bars Data Project's data for analysis and visualization purposes. You can expect to leave with a better understanding of how to perform comparative analyses amongst carceral facilities along axes such as gender, public/private status, and state. We will also cover how to merge the UCLA data set with external datasets such as the BJS, or Bureau of Justice Statistics, data. 
+We will cover a number of topics in this training around how to use the UCLA Law COVID-19 Behind Bars Data Project's data for analysis and visualization purposes. You can expect to leave with a better understanding of how to perform comparative analyses amongst carceral facilities along axes such as gender, public/private status, and state. We will also cover how to merge the UCLA data set with external datasets such as BJS, or Bureau of Justice Statistics, data. 
 
 There is no prior experience using the R programming language required for this training. For ease of use, we recommend opening this R Markdown file and following along within the RStudio application.
 
@@ -33,7 +33,7 @@ library(sjlabelled)
 library(stringr)
 ```
 
-The UCLA data team wrote a custom R package to help work with our data. You can read more about the package's functionality in the repository homepage, here: https://github.com/uclalawcovid19behindbars/behindbarstools.
+The UCLA data team has been developing a custom R package called `behindbarstools` to help work with our data. You can read more about the package's functionality in the repository homepage [here](https://github.com/uclalawcovid19behindbars/behindbarstools). The package documentation is also available [here](https://rdrr.io/github/uclalawcovid19behindbars/behindbarstools/). 
 
 ```{r, message=FALSE, warning=FALSE}
 ## install UCLA package
@@ -46,27 +46,37 @@ help(package=behindbarstools)
 
 ## Load Data
 
-Our latest data presents a snapshot in time of cumulative infections, deaths, recoveries, and other variables across states and jurisdictions. To load in the latest facility-level data, run the code below. 
+Our latest data presents a snapshot in time of cumulative infections, deaths, recoveries, and other variables across states and jurisdictions. To load in the latest facility-level data, run the code below. Note that we provide code to load the latest facility-level data using the `read_scrape_data` function in `behindbarstools`, along with code to load the data from the csv saved on Github in our [data repository](https://github.com/uclalawcovid19behindbars/data/tree/master/latest-data). 
 
-Note that our [data repository](https://github.com/uclalawcovid19behindbars/data/tree/master/latest-data) has state-aggregated and nationally-aggregated counts available in separate data sheets. 
+Out Github repository also includes state-aggregated and nationally-aggregated counts available in separate data sheets. 
 
 ```{r, message=FALSE, warning=FALSE}
-## should we use read_scrape_data for this? or load directly from github? 
-
-## if this option, walk through how to get to the "raw" data from the data repo 
-# latest_data <- read_csv("https://raw.githubusercontent.com/uclalawcovid19behindbars/data/master/latest-data/adult_facility_covid_counts.csv")
+## load using behindbarstools 
 latest_data <- read_scrape_data(all_dates = FALSE)
+
+## load from Github  
+# latest_data <- read_csv(stringr::str_c(
+#   "https://raw.githubusercontent.com/uclalawcovid19behindbars/data/master/",
+#   "latest-data/adult_facility_covid_counts.csv")
+# )
 ```
 
-For some states, you can also access historical data for all of the state-run facilities for which we collect data. To read in the historical data for the state of California, run the code below.
+For several states, you can also access historical data for all of the state-run facilities for which we collect data. To read in the historical data for the state of California, for example, run the code below.
 
 ```{r, message=FALSE, warning=FALSE}
-ca_historical <- read_csv("https://raw.githubusercontent.com/uclalawcovid19behindbars/historical-data/main/data/CA-historical-data.csv")
+## load using behindbarstools 
+ca_historical <- read_scrape_data(all_dates = TRUE, state = "California")
+
+## load from Github 
+# ca_historical <- read_csv(stringr::str_c(
+#   "https://raw.githubusercontent.com/uclalawcovid19behindbars/historical-data/", 
+#   "main/data/CA-historical-data.csv")
+# )
 ```
 
 ## Explore Data
 
-I like using the `skim()` function to get a quick glance at any data. You can also view the variable names by calling the function `names()`.
+I like using the `skim()` function to get a quick glance at any data. You can also view the variable names by calling the function `names()`. Before diving into exploring the data, we also strongly encourage you to reference the data dictionary that we host [here](https://github.com/uclalawcovid19behindbars/data). 
 
 ```{r, message=FALSE, warning=FALSE}
 skim(latest_data)
@@ -78,6 +88,7 @@ To dig more into the variables, we can use functions like `table()` and `count()
 ```{r, message=FALSE, warning=FALSE}
 ## what unique values exist for the variable "jurisdiction"?
 table(latest_data$Jurisdiction)
+
 ## how many entities were observed from each state on the most recent scrape?
 latest_data %>% 
   count(State)
@@ -93,7 +104,7 @@ latest_data %>%
 
 We have a lot of different types of facilities in our data set. To create a somewhat comparable group of facilities across the states, we filter to facilities that have had more than 25 COVID-19 infections among the incarcerated populations. 
 
-We also want to filter out jails, since they function quite differently than prisons, and we only collect the largest jails in the US. 
+We also want to filter out jails, since they function quite differently than prisons, and we only collect data from the handful of large jail systems in the US that report COVID-19 data on a regular basis. 
 
 ```{r, message=FALSE, warning=FALSE}
 ## add any other data filters to this?
@@ -107,9 +118,9 @@ table(is.na(latest_data$Residents.Population))
 
 filtered_data <- latest_data %>%
   filter(Residents.Confirmed > 24) %>% # filter out prisons with less than 25 infections
-  filter(Jurisdiction != "county")
+  filter(Jurisdiction != "county") # filter out county jails 
 
-nrow(filtered_data) # filtered out ~730 observations
+nrow(filtered_data) # filtered out ~830 observations
 ```
 
 Towards the goal of comparing facilities of different sizes, we calculate infection rates using the population from February 2020 as our denominator, and the cumulative number of COVID-19 infections among the incarcerated population as the numerator.
@@ -124,21 +135,22 @@ table(is.na(filtered_data$Residents.Confirmed))
 ```
 
 ## Merge Data 
-
-There is lots of helpful info contained within the BJS, or Bureau of Justice Statistics', data on prisons. We supply the BJS ID number for all facilities when it's identifiable. We can use the BJS ID to merge our data with the BJS data set. 
+There is lots of helpful info contained within the BJS, or Bureau of Justice Statistics', [census data on correctional facilities](https://www.bjs.gov/index.cfm?ty=dcdetail&iid=255). We supply the BJS ID number for all facilities when it's identifiable. We can use the `BJS.ID` variable to merge our data with the BJS data set. 
 
 ```{r, message=FALSE, warning=FALSE}
 table(is.na(filtered_data$BJS.ID)) ## BJS IDs present for about 2/3 of our data
 
 ## read in the BJS data
 ## should we host this data somewhere? if so, replace this path with a stable link
-## downloaded "STATA" verison of the data here: https://www.icpsr.umich.edu/web/NACJD/studies/37294# 
-bjs_data_path <- file.path("~", "UCLA", "misc-data", "BJS", 
-                           "ICPSR_37294", "DS0001","37294-0001-Data.dta")
+## downloaded "STATA" version of the data here: https://www.icpsr.umich.edu/web/NACJD/studies/37294# 
+# bjs_data_path <- file.path("~", "UCLA", "misc-data", "BJS", 
+#                            "ICPSR_37294", "DS0001","37294-0001-Data.dta")
+bjs_data_path <- "~/covid19behindbars/CDC-training/37294-0001-Data.dta"
+
 bjs_raw <- haven::read_dta(bjs_data_path)
 names(bjs_raw)
 ```
-It's hard to use this data when the variable names are so opaque! This data is *labelled*, meaning that the variable names and values are encoded in special ways. We use the `sjlabelled` and `haven` packages to make the BJS data more user-friendly. For more on working with labelled data in R, check out this article: https://www.pipinghotdata.com/posts/2020-12-23-leveraging-labelled-data-in-r/.
+It's hard to use this data when the variable names are so opaque! This data is *labelled*, meaning that the variable names and values are encoded in special ways. We use the `sjlabelled` and `haven` packages to make the BJS data more user-friendly. For more on working with labelled data in R, check out [this article](https://www.pipinghotdata.com/posts/2020-12-23-leveraging-labelled-data-in-r/).
 
 ```{r}
 ## convert column labels to column names
@@ -168,7 +180,6 @@ merged_df <- filtered_data %>%
 
 Now, that we have merged the UCLA COVID-19 dataset with the BJS facility information dataset, we can create plots and analyses exploring facility-level infection rates by facility operator type. We utilize the BJS specification of facility operator to group facilities by private and non-private status.
 
-
 ```{r, message=FALSE, warning=FALSE}
 ## QUESTION - should we include this section?? not sure how helpful it is
 
@@ -176,21 +187,52 @@ Now, that we have merged the UCLA COVID-19 dataset with the BJS facility informa
 table(merged_df$`Facility operator`)
 
 merged_out <- merged_df %>%
-  filter(!is.na(`Facility operator`)) %>% ## rm observations with missing facility operator classification
+  ## rm observations with missing facility operator classification
+  filter(!is.na(`Facility operator`)) %>% 
+  ## create binary variable for is vs. private prisons 
   mutate(is_private = ifelse(`Facility operator` == "Private contractor",
                           TRUE,
                           FALSE))
 
-table(merged_out$is_private)
+## summarize by group
+merged_out %>%
+  group_by(is_private) %>%
+  summarise(n = n(),
+            mean_pop = mean(Population.Feb20, na.rm = TRUE),
+            mean_cumulative_cases = mean(Residents.Confirmed, na.rm = TRUE), 
+            mean_case_rate = mean(confirmed_rate, na.rm = TRUE),
+            sum_deaths = sum_na_rm(Residents.Deaths))
+```
 
-ggplot(merged_out, 
+Based on this information, we can create plots visualizing differences in confirmed infection rates based on whether the facility is privately contracted or not. 
+
+```{r, message=FALSE, warning=FALSE}
+# scatterplot of confirmed rate against population by private status
+private_plot <- ggplot(merged_out, 
        aes(x = Population.Feb20, 
            y = confirmed_rate,
            color = is_private
            # color = `Facility operator`
            )) + 
-    geom_point() + 
+    geom_point(size = 1.0) 
+private_plot
+```
+
+Both the x-axis and the y-axis have most values grouped at the beginning of the scale, and a few outliers with very high populations and infection rates. Let's try putting the x- and y- axes on a log scale to bget a better look at what's going on in the data!
+
+```{r, message=FALSE, warning=FALSE}
+# log-transform 
+private_plot + 
   scale_x_continuous(trans='log') +
+  scale_y_continuous(trans='log') 
+  
+# boxplot of confirmed rates by private status 
+ggplot(merged_out, 
+       aes(x = is_private, 
+           y = confirmed_rate, 
+           color = is_private
+           )) + 
+    geom_boxplot() + 
   scale_y_continuous(trans='log')
 ```
 
@@ -231,22 +273,28 @@ gender_plot <- ggplot(gender_dat,
 gender_plot
 ```
 
-Both the x-axis and the y-axis have most values grouped at the beginning of the scale, and a few outliers with very high populations and infection rates. Let's try putting the x- and y- axes on a log scale to bget a better look at what's going on in the data!
-
 ```{r, message=FALSE, warning=FALSE}
 ## not sure whether or not to actually include this...............
 gender_plot + 
   # Log transformation using scale_x/y_continuous()
   # ?scale_x_continuous to see built-in transformations
   scale_x_continuous(trans='log') +
-  scale_y_continuous(trans='log')
+  scale_y_continuous(trans='log') 
+
+ggplot(gender_dat, 
+       aes(x = gender_combined, 
+           y = confirmed_rate, 
+           color = gender_combined
+           )) + 
+    geom_boxplot() + 
+  scale_y_continuous(trans='log') 
 ```
 
 DISCUSS: What are your questions after looking at this plot? What questions, if any, does it answer?
 
 ## County-level Comparison
 
-Next, we'll show how to use our historical COVID-19 data from carceral facilities to make comparisons between the infection rate inside of prison and in the surrounding county over time. We use the New York Times' COVID-19 data of cumulative cases and deaths in the US population on the county-level, available to the public here: https://github.com/nytimes/covid-19-data. 
+Next, we'll show how to use our historical COVID-19 data from carceral facilities to make comparisons between the infection rate inside of prison and in the surrounding county over time. We use the New York Times' COVID-19 data of cumulative cases and deaths in the US population on the county-level, available to the public [here](https://github.com/nytimes/covid-19-data).
 
 ```{r, message=FALSE, warning=FALSE}
 ## read in the NYT data
@@ -262,14 +310,10 @@ us_counties_df <- "https://raw.githubusercontent.com/nytimes/covid-19-data/maste
          County = county) %>%
   mutate(Name = "County Population")
 ```
-We'll use the California historical data to compare the COVID-19 infection rates over time in one prison to the surrounding county. 
+
+We'll use the California historical data to compare the COVID-19 infection rates over time in the California Correctional Institution to the surrounding Kern County. 
 
 ```{r, message=FALSE, warning=FALSE}
-## how many observations do we have for each prison in California? 
-ca_historical %>%
-  count(Name) %>% 
-  arrange(desc(n))
-
 ## select a prison to focus on! 
 ## CALIFORNIA STATE PRISON CORCORAN had ~4 separate outbreaks, could use that one
 focus_prison <- "CALIFORNIA CORRECTIONAL INSTITUTION"
@@ -284,15 +328,14 @@ ca_focus <- ca_historical %>%
   arrange(Date) %>%
   ## estimate active infections from cumulative count
   mutate(Active = diff_roll_sum(Residents.Confirmed, Date)) 
-  
-head(ca_focus)
 ```
 Now, we want to bind the county-level infection rate data with the UCLA prison data in order to make comparisons between COVID-19 outbreaks inside and outside of prison. To do so, we'll need to subset the county-level infection to the county in which our focus prison is located. We add in the total county population in order to calculate comparable rates, and then bind the two data sets together. 
 
 ```{r, message=FALSE, warning=FALSE}
 ## where is this prison located? 
 ca_focus %>%
-  select(County.FIPS, County)
+  select(County.FIPS, County) %>% 
+  head(1)
 
 prison_county_fips <- ca_focus$County.FIPS[1]
 
@@ -309,8 +352,6 @@ county_comparison <- ca_focus %>%
   bind_rows(one_county) %>%
   ## calculate estimated active infection rate
   mutate(Percent = Active / Population)
-
-table(county_comparison$Name)
 ```
 
 Now that we have a comparable data set with both the focus prison and the surrounding county's estimated active infection rates, we can make a plot. 
@@ -318,7 +359,7 @@ Now that we have a comparable data set with both the focus prison and the surrou
 ```{r, message=FALSE, warning=FALSE, fig.width = 10}
 county_comparison %>%
  ggplot(., aes(x = Date, y = Percent, color = Name)) +
-  geom_line(size = 2) +
+  geom_line(size = 1) +
   theme_minimal() + 
   labs(title = "Comparison of CA Prison and Surrounding County with Active Infections", 
        y = "Percent of Population Actively Infected") +
@@ -327,6 +368,4 @@ county_comparison %>%
 ```
 
 ## Data FAQs
-
-
 
