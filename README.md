@@ -11,11 +11,7 @@ Directory structure:
 ├── README.md          <- The top-level README, a guide for using this repository.
 ├── data
 │   ├── interim        <- Intermediate data that has been transformed.
-│   ├── processed      <- The final, canonical data sets for modeling.
-│   └── raw            <- The original, immutable data dump.
-│
-├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-│   └── figures        <- Generated graphics and figures to be used in reporting.
+│   └──  processed      <- The final, canonical data sets for modeling.
 │  
 ├── analyze_data.Rmd   <- Source code for use in this project.
 ```
