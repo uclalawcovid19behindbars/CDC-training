@@ -123,7 +123,7 @@ Which facilities had the highest infection rate on the most recent date of data 
 ```{r, message=FALSE, warning=FALSE}
 filtered_data %>%
   arrange(desc(confirmed_rate)) %>%
-  select(Jurisdiction, State, Name)
+  select(Jurisdiction, State, Name, confirmed_rate) %>%
   head()
 ```
 
