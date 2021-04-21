@@ -10,7 +10,7 @@ output:
 
 ## Introduction
 
-We will cover a number of topics in this training around how to use the UCLA Law COVID-19 Behind Bars Data Project's data for analysis and visualization purposes. You can expect to leave with a better understanding of how to perform comparative analyses amongst carceral facilities along axes such as gender, public/private status, and state. We will also cover how to merge the UCLA data set with external datasets such as BJS, or Bureau of Justice Statistics, data. 
+We will cover a number of topics in this training around how to use the UCLA Law COVID-19 Behind Bars Data Project's data for analysis and visualization purposes. You can expect to leave with a better understanding of how to perform comparative analyses amongst carceral facilities along axes such as gender, public/private status, and state. We will also cover how to merge the UCLA data set with external datasets such as BJS, or Bureau of Justice Statistics, data. Finally, we will walk through how to create a county comparison using time series COVID-19 data from a prison and the county in which it is located.
 
 There is no prior experience using the R programming language required for this training. For ease of use, we recommend opening this R Markdown file and following along within the RStudio application.
 
@@ -75,7 +75,7 @@ To dig more into the variables, we can use functions like `table()` and `count()
 ## what unique values exist for the variable "jurisdiction"?
 table(latest_data$Jurisdiction)
 
-## how many entities were observed from each state on the most recent scrape?
+## how many facilities were observed from each state on the most recent scrape?
 latest_data %>% 
   count(State)
 
@@ -374,3 +374,25 @@ ca_historical <- read_csv(stringr::str_c(
   "CA-historical-data.csv") ## state acronym here
 )
 ```
+
+#### Why is it better to look at one facility/county rather than all of them simultaneously? 
+
+When we compare the infection rates within a prison with the county in which it's located, we must contend with complexities within the data. For example, we know that correctional officers frequently do not live in the county where they work, and that when incarcerated people are released, they're often returning to counties other than the ones where they were incarcerated. While community spread analyses can reveal interesting trends between a prison and the surrounding area, we mention these complexities to caution against over-reliance on geographic denominators, particularly when our aggregating data away from the facility level. 
+
+#### What limitations should be kept in mind when using this data?
+
+We do our best to standardize variables across jurisdictions, but this is inherently challenging and constantly changing. We continue to add updates and known issues to our [data wiki](https://github.com/uclalawcovid19behindbars/data/wiki).
+
+Each row in our data set represents an entity/date combination. In most cases, an entity is a facility, but some agencies only report aggregated data (e.g. state-wide). Additionally, we are only able to collect the data that agencies report. As a result, aggregating our data to estimate national or state-wide totals from facility-level data should be done with caution. 
+
+Finally, our data is not comprehensive. We collect data for a small subset of all jails, and we continue to build additional scrapers as we discover additional COVID-19 carceral data sources. 
+
+#### How can we calculate state-aggregated and nationally-aggregated counts? 
+
+We maintain an up-to-date spreadsheet of [state-aggregated data](https://github.com/uclalawcovid19behindbars/data/blob/master/latest-data/state_aggregate_counts.csv) from state facilities, along with federal and immigration totals reported as separate rows. Data from county jails is NOT included in these aggregates because our data from county jails is not comprehensive. This dataset supplements information reported on agency websites with statewide aggregate totals reported by other sources including The Marshall Project and the AP.
+
+We also maintain an up-to-date spreadsheet of [nationally-aggregated data](https://github.com/uclalawcovid19behindbars/data/blob/master/latest-data/national_aggregate_counts.csv) from state, federal, and immigration facilities based on the same set of sources as the state-aggregated file. This dataset also reports the number of agencies reporting each metric and lists the agencies that are missing from each aggregated metric.
+
+#### What is unique about the UCLA data? 
+
+This is the only dataset that contains facility-level data for COVID-19 infections, deaths, and testing for all state and federal systems. We created this dataset by building and maintaining over 100 web scrapers to collect data 3-4 times per week, cleaning and standardizing the data on a daily basis, and loading the dataset to publicly-available platforms. The unique opportunities offered by this dataset include the ability to look at COVID-19-related trends at specific facilities as well as make comparisons among facilities and between facilities and surrounding counties." 
