@@ -19,8 +19,14 @@ There is no prior experience using the R programming language required for this 
 The code below loads in a few R packages that we'll use to manipulate the data in this session. A package bundles together code and documentation, and allows you to access helpful pre-written functions. To learn more about the most widely-used R packages, feel free to visit [this page](https://www.rstudio.com/products/rpackages/).
 
 ```{r package setup, message=FALSE, warning=FALSE}
-## install packages by un-commenting the line below (only do this one time) 
-# install.packages(c("tidyverse", "devtools", "skimr", "haven", "sjlabelled", "stringr))
+## check for existing packages, and if needed, install them in session
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(devtools)) install.packages("devtools", repos = "http://cran.us.r-project.org")
+if(!require(skimr)) install.packages("skimr", repos = "http://cran.us.r-project.org")
+if(!require(haven)) install.packages("haven", repos = "http://cran.us.r-project.org")
+if(!require(sjlabelled)) install.packages("sjlabelled", repos = "http://cran.us.r-project.org")
+if(!require(stringr)) install.packages("stringr", repos = "http://cran.us.r-project.org")
+
 ## load packages into session
 ## do this every time you re-start R 
 library(tidyverse) 
@@ -261,8 +267,8 @@ gender_plot
 
 ```{r, message=FALSE, warning=FALSE}
 gender_plot + 
-  # Log transformation using scale_x/y_continuous()
-  # ?scale_x_continuous to see built-in transformations
+  ## Log transformation using scale_x/y_continuous()
+  ## ?scale_x_continuous to see built-in transformations
   scale_x_continuous(trans='log') +
   scale_y_continuous(trans='log') 
 
@@ -284,7 +290,7 @@ Next, we'll show how to use our historical COVID-19 data from carceral facilitie
 ```{r, message=FALSE, warning=FALSE}
 ## read in the NYT data
 us_counties_df <- "https://raw.githubusercontent.com/nytimes/covid-19-data/master/" %>%
-   # str_c("us.csv") %>% # uncomment this for overall US data
+   # str_c("us.csv") %>% # un-comment this (remove "#") for overall US data
   str_c("us-counties.csv") %>%
   read_csv(col_types = cols()) %>%
   select(Date = date, 
@@ -374,10 +380,6 @@ ca_historical <- read_csv(stringr::str_c(
   "CA-historical-data.csv") ## state acronym here
 )
 ```
-
-#### Why is it better to look at one facility/county rather than all of them simultaneously? 
-
-When we compare the infection rates within a prison with the county in which it's located, we must contend with complexities within the data. For example, we know that correctional officers frequently do not live in the county where they work, and that when incarcerated people are released, they're often returning to counties other than the ones where they were incarcerated. While community spread analyses can reveal interesting trends between a prison and the surrounding area, we mention these complexities to caution against over-reliance on geographic denominators, particularly when our aggregating data away from the facility level. 
 
 #### What limitations should be kept in mind when using this data?
 
