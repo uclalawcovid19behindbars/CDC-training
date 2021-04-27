@@ -39,7 +39,7 @@ library(stringr)
 
 The UCLA data team has been developing a custom R package called `behindbarstools` to help work with our data. You can read more about the package's functionality in the repository homepage [here](https://github.com/uclalawcovid19behindbars/behindbarstools). The package documentation is also available [here](https://rdrr.io/github/uclalawcovid19behindbars/behindbarstools/). 
 
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 ## install UCLA package
 devtools::install_github("uclalawcovid19behindbars/behindbarstools")
 ## load UCLA package into session
